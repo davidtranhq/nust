@@ -15,17 +15,7 @@ public:
     TypeChecker() = default;
     
     // Main entry point for type checking
-    bool check_program(const Program& program) {
-        program_ = &program;
-        for (const auto& item : program.items) {
-            if (auto func = dynamic_cast<const FunctionDecl*>(item.get())) {
-                if (!check_function(*func)) {
-                    return false;
-                }
-            }
-        }
-        return !has_errors();
-    }
+    bool check_program(const Program& program);
     
     // Error reporting
     void error(const std::string& message, const Span& span);

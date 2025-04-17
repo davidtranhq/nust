@@ -415,4 +415,158 @@ TEST(ParserTest, ExpressionPrecedence) {
     ASSERT_EQ(right3->op, BinaryExpr::Op::Add);
 }
 
+TEST(ParserTest, AssignmentExpressions) {
+    // Valid assignments
+    std::string valid_source = R"(
+        fn main() {
+            let mut x: i32 = 42;
+            x = 10;
+            (x) = 20;  // Parenthesized identifier is allowed
+            let mut y: bool = true;
+            y = false;
+        }
+    )";
+    
+    Parser parser(valid_source);
+    auto program = parser.parse();
+    ASSERT_TRUE(program != nullptr);
+    
+    // Check the parse tree structure
+    auto* func = dynamic_cast<FunctionDecl*>(program->items[0].get());
+    ASSERT_TRUE(func != nullptr);
+    
+    auto* body = dynamic_cast<BlockStmt*>(func->body.get());
+    ASSERT_TRUE(body != nullptr);
+    ASSERT_EQ(body->statements.size(), 5);
+    
+    // Check the third statement ((x) = 20)
+    auto* expr_stmt = dynamic_cast<ExprStmt*>(body->statements[2].get());
+    ASSERT_TRUE(expr_stmt != nullptr);
+    
+    auto* assign = dynamic_cast<BinaryExpr*>(expr_stmt->expr.get());
+    ASSERT_TRUE(assign != nullptr);
+    ASSERT_EQ(assign->op, BinaryExpr::Op::Assignment);
+    
+    // Check left side (x)
+    auto* x_ident = dynamic_cast<Identifier*>(assign->left.get());
+    ASSERT_TRUE(x_ident != nullptr);
+    ASSERT_EQ(x_ident->name, "x");
+    
+    // Check right side (20)
+    auto* twenty_lit = dynamic_cast<IntLiteral*>(assign->right.get());
+    ASSERT_TRUE(twenty_lit != nullptr);
+    ASSERT_EQ(twenty_lit->value, 20);
+    
+    // Invalid assignment - should throw because it's not an identifier
+    std::string invalid_source = R"(
+        fn main() {
+            let mut x: i32 = 42;
+            x + 1 = 10;  // Cannot assign to binary expression
+        }
+    )";
+    
+    Parser parser2(invalid_source);
+    EXPECT_THROW(parser2.parse(), std::runtime_error);
+}
+
+TEST(ParserTest, AssignmentPrecedence) {
+    std::string source = R"(
+        fn main() {
+            let mut x: i32 = 42;
+            let mut y: i32 = 10;
+            x = y = 5;  // Right-associative: x = (y = 5)
+        }
+    )";
+    
+    Parser parser(source);
+    auto program = parser.parse();
+    ASSERT_TRUE(program != nullptr);
+    
+    // Check the parse tree structure
+    auto* func = dynamic_cast<FunctionDecl*>(program->items[0].get());
+    ASSERT_TRUE(func != nullptr);
+    
+    auto* body = dynamic_cast<BlockStmt*>(func->body.get());
+    ASSERT_TRUE(body != nullptr);
+    ASSERT_EQ(body->statements.size(), 3);
+    
+    // Check the last statement (x = y = 5)
+    auto* expr_stmt = dynamic_cast<ExprStmt*>(body->statements[2].get());
+    ASSERT_TRUE(expr_stmt != nullptr);
+    
+    auto* outer_assign = dynamic_cast<BinaryExpr*>(expr_stmt->expr.get());
+    ASSERT_TRUE(outer_assign != nullptr);
+    ASSERT_EQ(outer_assign->op, BinaryExpr::Op::Assignment);
+    
+    // Check left side (x)
+    auto* x_ident = dynamic_cast<Identifier*>(outer_assign->left.get());
+    ASSERT_TRUE(x_ident != nullptr);
+    ASSERT_EQ(x_ident->name, "x");
+    
+    // Check right side (y = 5)
+    auto* inner_assign = dynamic_cast<BinaryExpr*>(outer_assign->right.get());
+    ASSERT_TRUE(inner_assign != nullptr);
+    ASSERT_EQ(inner_assign->op, BinaryExpr::Op::Assignment);
+    
+    // Check left side of inner assignment (y)
+    auto* y_ident = dynamic_cast<Identifier*>(inner_assign->left.get());
+    ASSERT_TRUE(y_ident != nullptr);
+    ASSERT_EQ(y_ident->name, "y");
+    
+    // Check right side of inner assignment (5)
+    auto* five_lit = dynamic_cast<IntLiteral*>(inner_assign->right.get());
+    ASSERT_TRUE(five_lit != nullptr);
+    ASSERT_EQ(five_lit->value, 5);
+}
+
+TEST(ParserTest, AssignmentWithLogicalOperators) {
+    std::string source = R"(
+        fn main() {
+            let mut x: bool = true;
+            let mut y: bool = false;
+            x = y || true;  // Should be parsed as x = (y || true)
+        }
+    )";
+    
+    Parser parser(source);
+    auto program = parser.parse();
+    ASSERT_TRUE(program != nullptr);
+    
+    // Check the parse tree structure
+    auto* func = dynamic_cast<FunctionDecl*>(program->items[0].get());
+    ASSERT_TRUE(func != nullptr);
+    
+    auto* body = dynamic_cast<BlockStmt*>(func->body.get());
+    ASSERT_TRUE(body != nullptr);
+    ASSERT_EQ(body->statements.size(), 3);
+    
+    // Check the last statement (x = y || true)
+    auto* expr_stmt = dynamic_cast<ExprStmt*>(body->statements[2].get());
+    ASSERT_TRUE(expr_stmt != nullptr);
+    
+    auto* assign = dynamic_cast<BinaryExpr*>(expr_stmt->expr.get());
+    ASSERT_TRUE(assign != nullptr);
+    ASSERT_EQ(assign->op, BinaryExpr::Op::Assignment);
+    
+    // Check left side (x)
+    auto* x_ident = dynamic_cast<Identifier*>(assign->left.get());
+    ASSERT_TRUE(x_ident != nullptr);
+    ASSERT_EQ(x_ident->name, "x");
+    
+    // Check right side (y || true)
+    auto* or_expr = dynamic_cast<BinaryExpr*>(assign->right.get());
+    ASSERT_TRUE(or_expr != nullptr);
+    ASSERT_EQ(or_expr->op, BinaryExpr::Op::Or);
+    
+    // Check left side of OR (y)
+    auto* y_ident = dynamic_cast<Identifier*>(or_expr->left.get());
+    ASSERT_TRUE(y_ident != nullptr);
+    ASSERT_EQ(y_ident->name, "y");
+    
+    // Check right side of OR (true)
+    auto* true_lit = dynamic_cast<BoolLiteral*>(or_expr->right.get());
+    ASSERT_TRUE(true_lit != nullptr);
+    ASSERT_TRUE(true_lit->value);
+}
+
 } // namespace nust 

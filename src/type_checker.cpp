@@ -5,6 +5,18 @@
 
 namespace nust {
 
+bool TypeChecker::check_program(const Program& program) {
+    program_ = &program;
+    for (const auto& item : program.items) {
+        if (auto func = dynamic_cast<const FunctionDecl*>(item.get())) {
+            if (!check_function(*func)) {
+                return false;
+            }
+        }
+    }
+    return !has_errors();
+}
+
 bool TypeChecker::check_function(const FunctionDecl& func) {
     enter_scope();
     
@@ -169,6 +181,35 @@ bool TypeChecker::check_expression(const Expr& expr) {
         }
         
         switch (binary->op) {
+            case BinaryExpr::Op::Assignment: {
+                // Check that left side is an identifier
+                auto* left_ident = dynamic_cast<const Identifier*>(binary->left.get());
+                if (!left_ident) {
+                    error("Left side of assignment must be an identifier", binary->left->span);
+                    return false;
+                }
+                
+                // Check that the variable is mutable
+                auto var_info = lookup_variable(left_ident->name);
+                if (!var_info || !var_info->is_mut) {
+                    error("Cannot assign to immutable variable: " + left_ident->name, binary->left->span);
+                    return false;
+                }
+                
+                // Check type compatibility
+                if (!is_assignable(*var_info->type, *binary->right->type)) {
+                    error("Type mismatch in assignment", expr.span);
+                    return false;
+                }
+                
+                // Assignment expressions have the type of the right operand
+                expr.type = std::make_unique<Type>(binary->right->type->kind, expr.span);
+                if (binary->right->type->base_type) {
+                    expr.type->base_type = binary->right->type->base_type->clone();
+                }
+                break;
+            }
+            
             case BinaryExpr::Op::Add:
             case BinaryExpr::Op::Sub:
             case BinaryExpr::Op::Mul:

@@ -183,7 +183,8 @@ public:
     enum class Op {
         Add, Sub, Mul, Div,
         Eq, Ne, Lt, Gt, Le, Ge,
-        And, Or  // Logical AND and OR
+        And, Or,  // Logical AND and OR
+        Assignment  // =
     };
     Op op;
     std::unique_ptr<Expr> left;
@@ -234,6 +235,15 @@ public:
     Type(Kind kind, Span span) : kind(kind), span(span) {}
     Type(Kind kind, std::unique_ptr<Type> base_type, Span span)
         : kind(kind), base_type(std::move(base_type)), span(span) {}
+    
+    // Clone method for deep copying
+    std::unique_ptr<Type> clone() const {
+        if (base_type) {
+            return std::make_unique<Type>(kind, base_type->clone(), span);
+        } else {
+            return std::make_unique<Type>(kind, span);
+        }
+    }
 };
 
 class Parser {
@@ -279,6 +289,7 @@ private:
     std::unique_ptr<Expr> parse_primary();
     std::unique_ptr<Expr> parse_or();
     std::unique_ptr<Expr> parse_and();
+    std::unique_ptr<Expr> parse_assignment();
     
     std::string source;
     size_t pos = 0;

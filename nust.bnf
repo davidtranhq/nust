@@ -46,6 +46,7 @@
                 | "&" <expr>                            // immutable borrow
                 | "&mut" <expr>                         // mutable borrow
                 | "(" <expr> ")"                        // grouping
+                | <ident> "=" <expr>                    // assignment
 
 <arg_list_opt> ::= <arg_list>
                  | ε

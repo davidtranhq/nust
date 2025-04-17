@@ -2,6 +2,7 @@
 #include <cctype>
 #include <sstream>
 #include <stdexcept>
+#include <iostream>
 
 namespace nust {
 
@@ -21,7 +22,7 @@ std::unique_ptr<Program> Parser::parse() {
         }
         skip_whitespace();
     }
-    
+
     return std::make_unique<Program>(make_span(start), std::move(items));
 }
 
@@ -271,7 +272,34 @@ std::unique_ptr<BlockStmt> Parser::parse_block() {
 }
 
 std::unique_ptr<Expr> Parser::parse_expr() {
-    return parse_or();
+    return parse_assignment();
+}
+
+std::unique_ptr<Expr> Parser::parse_assignment() {
+    std::cout << "Starting parse_assignment at pos " << pos << std::endl;
+    auto lhs = parse_or();
+    std::cout << "Parsed LHS, type: " << typeid(*lhs.get()).name() << std::endl;
+    
+    if (match("=")) {
+        std::cout << "Found = operator" << std::endl;
+        skip_whitespace();
+        // Validate that left side is an identifier
+        if (dynamic_cast<Identifier*>(lhs.get()) == nullptr) {
+            std::cout << "LHS is not an identifier, throwing error" << std::endl;
+            throw std::runtime_error("Invalid assignment target");
+        }
+        std::cout << "LHS is an identifier, proceeding with assignment" << std::endl;
+        auto rhs = parse_assignment();  // Right-associative
+        return std::make_unique<BinaryExpr>(
+            make_span(lhs->span.start),
+            BinaryExpr::Op::Assignment,
+            std::move(lhs),
+            std::move(rhs)
+        );
+    }
+    
+    std::cout << "No = operator found, returning LHS" << std::endl;
+    return lhs;
 }
 
 std::unique_ptr<Expr> Parser::parse_or() {

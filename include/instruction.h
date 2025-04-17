@@ -1,92 +1,87 @@
-#ifndef NUST_INSTRUCTION_H
-#define NUST_INSTRUCTION_H
+#pragma once
 
-#include "value.h"
-#include <vector>
-#include <memory>
+#include <cstddef>
+#include <cstdint>
 
 namespace nust {
 
-class VM; // Forward declaration
-
-class Instruction {
-public:
-    virtual ~Instruction() = default;
-    virtual bool execute(VM& vm) = 0;
+// Opcodes for the virtual machine
+enum class Opcode : uint8_t {
+    // Stack operations
+    PUSH_I32,   // Push 32-bit integer constant
+    PUSH_BOOL,  // Push boolean constant
+    PUSH_STR,   // Push string constant
+    POP,        // Pop top value from stack
+    DUP,
+    SWAP,
+    
+    // Variable operations
+    LOAD,       // Load local variable onto stack
+    STORE,      // Store top of stack into local variable
+    LOAD_REF,   // Load reference to local variable
+    STORE_REF,  // Store reference to local variable
+    
+    // Arithmetic operations
+    ADD_I32,    // Add two integers
+    SUB_I32,    // Subtract two integers
+    MUL_I32,    // Multiply two integers
+    DIV_I32,    // Divide two integers
+    NEG_I32,    // Negate integer
+    
+    // Comparison operations
+    EQ_I32,     // Integer equality
+    NE_I32,     // Integer inequality
+    LT_I32,     // Integer less than
+    GT_I32,     // Integer greater than
+    LE_I32,     // Integer less than or equal
+    GE_I32,     // Integer greater than or equal
+    
+    // Logical operations
+    AND,        // Logical AND
+    OR,         // Logical OR
+    NOT,        // Logical NOT
+    
+    // Control flow
+    JMP,        // Unconditional jump
+    JMP_IF,     // Jump if top of stack is true
+    JMP_IF_NOT, // Jump if top of stack is false
+    CALL,       // Call function
+    RET,        // Return from function (no value)
+    RET_VAL,    // Return from function with value
+    
+    // Reference operations
+    BORROW,     // Create immutable reference
+    BORROW_MUT, // Create mutable reference
+    DEREF,      // Dereference reference
+    DEREF_MUT   // Dereference mutable reference
 };
 
-// Push a constant value onto the stack
-class PushInstruction : public Instruction {
-public:
-    PushInstruction(Value value) : value_(value) {}
-    bool execute(VM& vm) override;
-
-private:
-    Value value_;
+// Instruction structure
+struct Instruction {
+    Opcode opcode;
+    size_t operand;  // Optional operand (e.g., constant index, local variable index, jump offset)
+    
+    Instruction(Opcode opcode) : opcode(opcode), operand(0) {}
+    Instruction(Opcode opcode, size_t operand) : opcode(opcode), operand(operand) {}
+    
+    // Helper to determine if this instruction type has an operand
+    bool has_operand() const {
+        switch (opcode) {
+            case Opcode::PUSH_I32:
+            case Opcode::PUSH_BOOL:
+            case Opcode::PUSH_STR:
+            case Opcode::LOAD:
+            case Opcode::STORE:
+            case Opcode::LOAD_REF:
+            case Opcode::JMP:
+            case Opcode::JMP_IF:
+            case Opcode::JMP_IF_NOT:
+            case Opcode::CALL:
+                return true;
+            default:
+                return false;
+        }
+    }
 };
 
-// Pop a value from the stack
-class PopInstruction : public Instruction {
-public:
-    bool execute(VM& vm) override;
-};
-
-// Add two values from the stack
-class AddInstruction : public Instruction {
-public:
-    bool execute(VM& vm) override;
-};
-
-// Subtract two values from the stack
-class SubInstruction : public Instruction {
-public:
-    bool execute(VM& vm) override;
-};
-
-// Multiply two values from the stack
-class MulInstruction : public Instruction {
-public:
-    bool execute(VM& vm) override;
-};
-
-// Divide two values from the stack
-class DivInstruction : public Instruction {
-public:
-    bool execute(VM& vm) override;
-};
-
-// Compare two values for equality
-class EqInstruction : public Instruction {
-public:
-    bool execute(VM& vm) override;
-};
-
-// Compare two values for inequality
-class NeqInstruction : public Instruction {
-public:
-    bool execute(VM& vm) override;
-};
-
-// Load a value from a global variable
-class LoadGlobalInstruction : public Instruction {
-public:
-    LoadGlobalInstruction(size_t index) : index_(index) {}
-    bool execute(VM& vm) override;
-
-private:
-    size_t index_;
-};
-
-// Store a value to a global variable
-class StoreGlobalInstruction : public Instruction {
-public:
-    StoreGlobalInstruction(size_t index) : index_(index) {}
-    bool execute(VM& vm) override;
-
-private:
-    size_t index_;
-};
-
-} // namespace nust
-
-#endif // NUST_INSTRUCTION_H 
+} // namespace nust 
