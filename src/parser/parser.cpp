@@ -137,7 +137,12 @@ std::unique_ptr<Stmt> Parser::parse_statement() {
     size_t start = pos;
     auto expr = parse_expr();
     skip_whitespace();
-    expect(";");
+    
+    // If we're at the end of a block or at EOF, allow missing semicolon
+    if (!peek("}") && !at_end()) {
+        expect(";");
+    }
+    
     return std::make_unique<ExprStmt>(make_span(start), current_scope, std::move(expr));
 }
 
