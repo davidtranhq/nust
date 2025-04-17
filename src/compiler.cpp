@@ -93,9 +93,7 @@ void Compiler::compile_let(const LetStmt* stmt) {
 }
 
 void Compiler::compile_expression(const Expr* expr) {
-    std::cerr << "Compiling expression\n";
     if (auto binary = dynamic_cast<const BinaryExpr*>(expr)) {
-        std::cerr << "Compiling binary expression\n";
         
         // Handle assignment
         if (binary->op == BinaryExpr::Op::Assignment) {
@@ -161,7 +159,6 @@ void Compiler::compile_expression(const Expr* expr) {
                 throw std::runtime_error("Unknown binary operator");
         }
     } else if (auto unary = dynamic_cast<const UnaryExpr*>(expr)) {
-        std::cerr << "Compiling unary expression\n";
         compile_expression(unary->expr.get());
         switch (unary->op) {
             case UnaryExpr::Op::Neg:
@@ -172,24 +169,18 @@ void Compiler::compile_expression(const Expr* expr) {
                 break;
         }
     } else if (auto int_lit = dynamic_cast<const IntLiteral*>(expr)) {
-        std::cerr << "Compiling integer literal: " << int_lit->value << "\n";
         emit(Instruction{Opcode::PUSH_I32, static_cast<size_t>(int_lit->value)});
     } else if (auto bool_lit = dynamic_cast<const BoolLiteral*>(expr)) {
-        std::cerr << "Compiling boolean literal: " << bool_lit->value << "\n";
         emit(Instruction{Opcode::PUSH_BOOL, static_cast<size_t>(bool_lit->value)});
     } else if (auto str_lit = dynamic_cast<const StringLiteral*>(expr)) {
-        std::cerr << "Compiling string literal: " << str_lit->value << "\n";
         size_t index = string_constants.size();
         string_constants.push_back(str_lit->value);
         emit(Instruction{Opcode::PUSH_STR, index});
     } else if (auto ident = dynamic_cast<const Identifier*>(expr)) {
-        std::cerr << "Compiling identifier expression: " << ident->name << "\n";
         compile_identifier(ident);
     } else if (auto call = dynamic_cast<const CallExpr*>(expr)) {
-        std::cerr << "Compiling call expression\n";
         compile_call(call);
     } else if (auto borrow = dynamic_cast<const BorrowExpr*>(expr)) {
-        std::cerr << "Compiling borrow expression\n";
         compile_borrow(borrow);
     }
 }
@@ -227,18 +218,13 @@ void Compiler::compile_borrow(const BorrowExpr* expr) {
 }
 
 void Compiler::compile_if(const IfStmt* if_stmt) {
-    std::cout << "Compiling if statement" << std::endl;
-    
     // Compile condition
-    std::cout << "Compiling condition" << std::endl;
     compile_expression(if_stmt->condition.get());
     
     // Emit conditional jump
-    std::cout << "Emitting conditional jump" << std::endl;
     size_t else_jump = emit_instruction(Opcode::JMP_IF_NOT, 0);
     
     // Compile then branch
-    std::cout << "Compiling then branch" << std::endl;
     compile_statement(if_stmt->then_branch.get());
     
     // If there's an else branch, emit jump to skip it
@@ -248,7 +234,6 @@ void Compiler::compile_if(const IfStmt* if_stmt) {
     }
     
     // Update else jump offset
-    std::cout << "Updating else jump offset to " << instructions.size() << std::endl;
     instructions[else_jump].operand = instructions.size();
     
     // Compile else branch if present
@@ -257,38 +242,27 @@ void Compiler::compile_if(const IfStmt* if_stmt) {
         // Update end jump offset
         instructions[end_jump].operand = instructions.size();
     }
-    
-    std::cout << "Finished compiling if statement" << std::endl;
 }
 
 void Compiler::compile_while(const WhileStmt* while_stmt) {
-    std::cout << "Compiling while loop" << std::endl;
-    
     // Save loop start position
     size_t loop_start = instructions.size();
     
     // Compile condition
-    std::cout << "Compiling condition" << std::endl;
     compile_expression(while_stmt->condition.get());
     
     // Emit conditional jump
-    std::cout << "Emitting conditional jump" << std::endl;
     size_t exit_jump = emit_instruction(Opcode::JMP_IF_NOT, 0);
     
     
     // Compile body
-    std::cout << "Compiling loop body" << std::endl;
     compile_statement(while_stmt->body.get());
     
     // Emit jump back to condition
-    std::cout << "Emitting jump back to condition" << std::endl;
     emit_instruction(Opcode::JMP, loop_start);
     
     // Update exit jump offset
-    std::cout << "Updating exit jump offset to " << instructions.size() << std::endl;
     instructions[exit_jump].operand = instructions.size();
-    
-    std::cout << "Finished compiling while loop" << std::endl;
 }
 
 void Compiler::compile_block(const BlockStmt* block) {

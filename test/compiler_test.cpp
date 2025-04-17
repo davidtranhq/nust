@@ -24,17 +24,6 @@ protected:
         Compiler compiler;
         auto instructions = compiler.compile(*program);
         
-        // Debug output
-        std::cout << "\nActual bytecode:\n";
-        for (size_t i = 0; i < instructions.size(); ++i) {
-            std::cout << i << ": " << opcode_to_string(instructions[i].opcode);
-            if (instructions[i].has_operand()) {
-                std::cout << " " << instructions[i].operand;
-            }
-            std::cout << "\n";
-        }
-        std::cout << std::endl;
-        
         return instructions;
     }
     
