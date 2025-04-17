@@ -1,46 +1,46 @@
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Iinclude -I/opt/homebrew/Cellar/googletest/1.16.0/include
+CXXFLAGS = -std=c++17 -I/opt/homebrew/Cellar/googletest/1.16.0/include -Iinclude
 LDFLAGS = -L/opt/homebrew/Cellar/googletest/1.16.0/lib -lgtest -lgtest_main -pthread
 
 SRC_DIR = src
-BUILD_DIR = build
+OBJ_DIR = build
 TEST_DIR = test
-TARGET = nust
-TEST_TARGET = nust_test
 
 # Main program sources (excluding main.cpp)
-LIB_SRCS = $(filter-out $(SRC_DIR)/main.cpp, $(wildcard $(SRC_DIR)/*.cpp))
-LIB_OBJS = $(LIB_SRCS:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
+LIB_SRCS = $(filter-out $(SRC_DIR)/main.cpp, $(wildcard $(SRC_DIR)/*.cpp)) $(wildcard $(SRC_DIR)/*/*.cpp)
+LIB_OBJS = $(patsubst $(SRC_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(LIB_SRCS))
 
-# Main program executable source
+# Main program executable sources
 MAIN_SRC = $(SRC_DIR)/main.cpp
-MAIN_OBJ = $(BUILD_DIR)/main.o
+MAIN_OBJ = $(OBJ_DIR)/main.o
 
 # Test sources
 TEST_SRCS = $(wildcard $(TEST_DIR)/*.cpp)
-TEST_OBJS = $(TEST_SRCS:$(TEST_DIR)/%.cpp=$(BUILD_DIR)/%.o)
+TEST_OBJS = $(patsubst $(TEST_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(TEST_SRCS))
 
-.PHONY: all clean directories test
+TARGET = nust
+TEST_TARGET = nust_test
 
-all: directories $(TARGET)
+.PHONY: all clean test
 
-test: directories $(TEST_TARGET)
+all: $(TARGET)
+
+test: $(TEST_TARGET)
 	./$(TEST_TARGET)
 
-directories:
-	@mkdir -p $(BUILD_DIR)
-
 $(TARGET): $(LIB_OBJS) $(MAIN_OBJ)
-	$(CXX) $(LDFLAGS) -o $@ $^
+	$(CXX) $^ -o $@
 
 $(TEST_TARGET): $(LIB_OBJS) $(TEST_OBJS)
-	$(CXX) $(LDFLAGS) -o $@ $^
+	$(CXX) $^ -o $@ $(LDFLAGS)
 
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/%.o: $(TEST_DIR)/%.cpp
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
+$(OBJ_DIR)/%.o: $(TEST_DIR)/%.cpp
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(BUILD_DIR) $(TARGET) $(TEST_TARGET) 
+	rm -rf $(OBJ_DIR) $(TARGET) $(TEST_TARGET) 
