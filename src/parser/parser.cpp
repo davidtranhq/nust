@@ -238,8 +238,19 @@ std::unique_ptr<BlockStmt> Parser::parse_block() {
     
     skip_whitespace();
     while (!at_end() && !peek("}")) {
-        statements.push_back(parse_statement());
-        skip_whitespace();
+        try {
+            statements.push_back(parse_statement());
+            skip_whitespace();
+        } catch (const std::runtime_error& e) {
+            // If we hit an error, try to find the next statement or closing brace
+            while (!at_end() && !peek("}") && !peek("let") && !peek("if") && !peek("while")) {
+                pos++;  // Move to next character
+                skip_whitespace();
+            }
+            if (at_end()) {
+                error("Unclosed block");
+            }
+        }
     }
     
     expect("}");
