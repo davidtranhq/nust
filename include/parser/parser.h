@@ -146,7 +146,7 @@ public:
 
 class Expr : public ASTNode {
 public:
-    std::unique_ptr<Type> type;  // Type of the expression, filled in by type checker
+    mutable std::unique_ptr<Type> type;  // Type of the expression, filled in by type checker
     virtual ~Expr() = default;
 protected:
     Expr(Span span) : ASTNode(span) {}
@@ -173,7 +173,7 @@ public:
 class Identifier : public Expr {
 public:
     std::string name;
-    bool is_mut_binding;  // Whether this identifier refers to a mutable binding
+    mutable bool is_mut_binding;  // Whether this identifier refers to a mutable binding
     Identifier(Span span, std::string name)
         : Expr(span), name(std::move(name)), is_mut_binding(false) {}
 };

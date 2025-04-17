@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -std=c++17 -I/opt/homebrew/Cellar/googletest/1.16.0/include -Iinclude
+CXXFLAGS = -std=c++17 -I/opt/homebrew/Cellar/googletest/1.16.0/include -Iinclude -I/opt/homebrew/include
 LDFLAGS = -L/opt/homebrew/Cellar/googletest/1.16.0/lib -lgtest -lgtest_main -pthread
 
 SRC_DIR = src
