@@ -5,10 +5,12 @@
 
 namespace nust {
 
-Parser::Parser(std::string source) : source(std::move(source)) {}
+Parser::Parser(std::string source) 
+    : source(std::move(source)), current_scope(std::make_shared<Scope>()) {}
 
 std::unique_ptr<Program> Parser::parse() {
     std::vector<std::unique_ptr<ASTNode>> items;
+    size_t start = pos;
     
     skip_whitespace();
     while (!at_end()) {
@@ -20,10 +22,11 @@ std::unique_ptr<Program> Parser::parse() {
         skip_whitespace();
     }
     
-    return std::make_unique<Program>(std::move(items));
+    return std::make_unique<Program>(make_span(start), std::move(items));
 }
 
 std::unique_ptr<FunctionDecl> Parser::parse_function() {
+    size_t start = pos;
     expect("fn");
     skip_whitespace();
     
@@ -35,9 +38,36 @@ std::unique_ptr<FunctionDecl> Parser::parse_function() {
     expect(")");
     skip_whitespace();
     
+    // Parse return type if present
+    std::unique_ptr<Type> return_type;
+    if (match("->")) {
+        skip_whitespace();
+        return_type = parse_type();
+        skip_whitespace();
+    } else {
+        // Default return type is unit/void
+        return_type = std::make_unique<Type>(Type::Kind::I32, make_span(pos));
+    }
+    
+    // Create new scope for function body
+    auto function_scope = enter_scope();
+    
+    // Add parameters to scope
+    for (const auto& param : params) {
+        function_scope->declarations.push_back(param.name);
+    }
+    
     auto body = parse_block();
     
-    return std::make_unique<FunctionDecl>(std::move(name), std::move(params), std::move(body));
+    exit_scope();
+    
+    return std::make_unique<FunctionDecl>(
+        make_span(start),
+        std::move(name),
+        std::move(params),
+        std::move(return_type),
+        std::move(body)
+    );
 }
 
 std::vector<FunctionDecl::Param> Parser::parse_params() {
@@ -47,6 +77,7 @@ std::vector<FunctionDecl::Param> Parser::parse_params() {
     if (peek(")")) return params;
     
     do {
+        size_t param_start = pos;
         skip_whitespace();
         bool is_mut = match("mut");
         if (is_mut) skip_whitespace();
@@ -59,7 +90,13 @@ std::vector<FunctionDecl::Param> Parser::parse_params() {
         
         auto type = parse_type();
         
-        params.push_back(FunctionDecl::Param{is_mut, std::move(name), std::move(type)});
+        params.push_back(FunctionDecl::Param{
+            is_mut,
+            std::move(name),
+            std::move(type),
+            make_span(param_start)
+        });
+        
         skip_whitespace();
     } while (match(","));
     
@@ -67,16 +104,22 @@ std::vector<FunctionDecl::Param> Parser::parse_params() {
 }
 
 std::unique_ptr<Type> Parser::parse_type() {
+    size_t start = pos;
+    
     if (match("&")) {
         bool is_mut = match("mut");
         if (is_mut) skip_whitespace();
         auto inner = parse_type();
-        return std::make_unique<Type>(is_mut ? Type::Kind::MutRef : Type::Kind::Ref, std::move(inner));
+        return std::make_unique<Type>(
+            is_mut ? Type::Kind::MutRef : Type::Kind::Ref,
+            std::move(inner),
+            make_span(start)
+        );
     }
     
-    if (match("i32")) return std::make_unique<Type>(Type::Kind::I32);
-    if (match("bool")) return std::make_unique<Type>(Type::Kind::Bool);
-    if (match("str")) return std::make_unique<Type>(Type::Kind::Str);
+    if (match("i32")) return std::make_unique<Type>(Type::Kind::I32, make_span(start));
+    if (match("bool")) return std::make_unique<Type>(Type::Kind::Bool, make_span(start));
+    if (match("str")) return std::make_unique<Type>(Type::Kind::Str, make_span(start));
     
     error("Expected type");
     return nullptr;
@@ -91,13 +134,15 @@ std::unique_ptr<Stmt> Parser::parse_statement() {
     if (match("{")) return parse_block();
     
     // Expression statement
+    size_t start = pos;
     auto expr = parse_expr();
     skip_whitespace();
     expect(";");
-    return std::make_unique<ExprStmt>(std::move(expr));
+    return std::make_unique<ExprStmt>(make_span(start), current_scope, std::move(expr));
 }
 
 std::unique_ptr<LetStmt> Parser::parse_let() {
+    size_t start = pos;
     skip_whitespace();
     bool is_mut = match("mut");
     if (is_mut) skip_whitespace();
@@ -118,42 +163,77 @@ std::unique_ptr<LetStmt> Parser::parse_let() {
     skip_whitespace();
     expect(";");
     
-    return std::make_unique<LetStmt>(is_mut, std::move(name), std::move(type), std::move(init));
+    // Add variable to current scope
+    current_scope->declarations.push_back(name);
+    
+    return std::make_unique<LetStmt>(
+        make_span(start),
+        current_scope,
+        is_mut,
+        std::move(name),
+        std::move(type),
+        std::move(init)
+    );
 }
 
 std::unique_ptr<IfStmt> Parser::parse_if() {
+    size_t start = pos;
     skip_whitespace();
+    
     auto condition = parse_expr();
     skip_whitespace();
     
+    auto then_scope = enter_scope();
     auto then_branch = parse_block();
+    exit_scope();
+    
     skip_whitespace();
     
     std::unique_ptr<Stmt> else_branch;
     if (match("else")) {
         skip_whitespace();
+        auto else_scope = enter_scope();
         if (match("if")) {
             else_branch = parse_if();
         } else {
             else_branch = parse_block();
         }
+        exit_scope();
     }
     
-    return std::make_unique<IfStmt>(std::move(condition), std::move(then_branch), std::move(else_branch));
+    return std::make_unique<IfStmt>(
+        make_span(start),
+        current_scope,
+        std::move(condition),
+        std::move(then_branch),
+        std::move(else_branch)
+    );
 }
 
 std::unique_ptr<WhileStmt> Parser::parse_while() {
+    size_t start = pos;
     skip_whitespace();
+    
     auto condition = parse_expr();
     skip_whitespace();
     
+    auto body_scope = enter_scope();
     auto body = parse_block();
+    exit_scope();
     
-    return std::make_unique<WhileStmt>(std::move(condition), std::move(body));
+    return std::make_unique<WhileStmt>(
+        make_span(start),
+        current_scope,
+        std::move(condition),
+        std::move(body)
+    );
 }
 
 std::unique_ptr<BlockStmt> Parser::parse_block() {
+    size_t start = pos;
     expect("{");
+    
+    auto block_scope = enter_scope();
     std::vector<std::unique_ptr<Stmt>> statements;
     
     skip_whitespace();
@@ -163,7 +243,15 @@ std::unique_ptr<BlockStmt> Parser::parse_block() {
     }
     
     expect("}");
-    return std::make_unique<BlockStmt>(std::move(statements));
+    
+    auto block = std::make_unique<BlockStmt>(
+        make_span(start),
+        block_scope,
+        std::move(statements)
+    );
+    
+    exit_scope();
+    return block;
 }
 
 std::unique_ptr<Expr> Parser::parse_expr() {
@@ -171,6 +259,7 @@ std::unique_ptr<Expr> Parser::parse_expr() {
 }
 
 std::unique_ptr<Expr> Parser::parse_equality() {
+    size_t start = pos;
     auto expr = parse_comparison();
     
     while (true) {
@@ -178,11 +267,21 @@ std::unique_ptr<Expr> Parser::parse_equality() {
         if (match("==")) {
             skip_whitespace();
             auto right = parse_comparison();
-            expr = std::make_unique<BinaryExpr>(BinaryExpr::Op::Eq, std::move(expr), std::move(right));
+            expr = std::make_unique<BinaryExpr>(
+                make_span(start),
+                BinaryExpr::Op::Eq,
+                std::move(expr),
+                std::move(right)
+            );
         } else if (match("!=")) {
             skip_whitespace();
             auto right = parse_comparison();
-            expr = std::make_unique<BinaryExpr>(BinaryExpr::Op::Ne, std::move(expr), std::move(right));
+            expr = std::make_unique<BinaryExpr>(
+                make_span(start),
+                BinaryExpr::Op::Ne,
+                std::move(expr),
+                std::move(right)
+            );
         } else {
             break;
         }
@@ -192,100 +291,117 @@ std::unique_ptr<Expr> Parser::parse_equality() {
 }
 
 std::unique_ptr<Expr> Parser::parse_comparison() {
+    size_t start = pos;
     auto expr = parse_term();
     
     while (true) {
         skip_whitespace();
-        if (match("<")) {
-            skip_whitespace();
-            auto right = parse_term();
-            expr = std::make_unique<BinaryExpr>(BinaryExpr::Op::Lt, std::move(expr), std::move(right));
-        } else if (match("<=")) {
-            skip_whitespace();
-            auto right = parse_term();
-            expr = std::make_unique<BinaryExpr>(BinaryExpr::Op::Le, std::move(expr), std::move(right));
-        } else if (match(">")) {
-            skip_whitespace();
-            auto right = parse_term();
-            expr = std::make_unique<BinaryExpr>(BinaryExpr::Op::Gt, std::move(expr), std::move(right));
-        } else if (match(">=")) {
-            skip_whitespace();
-            auto right = parse_term();
-            expr = std::make_unique<BinaryExpr>(BinaryExpr::Op::Ge, std::move(expr), std::move(right));
-        } else {
-            break;
-        }
+        BinaryExpr::Op op;
+        if (match("<")) op = BinaryExpr::Op::Lt;
+        else if (match("<=")) op = BinaryExpr::Op::Le;
+        else if (match(">")) op = BinaryExpr::Op::Gt;
+        else if (match(">=")) op = BinaryExpr::Op::Ge;
+        else break;
+        
+        skip_whitespace();
+        auto right = parse_term();
+        expr = std::make_unique<BinaryExpr>(
+            make_span(start),
+            op,
+            std::move(expr),
+            std::move(right)
+        );
     }
     
     return expr;
 }
 
 std::unique_ptr<Expr> Parser::parse_term() {
+    size_t start = pos;
     auto expr = parse_factor();
     
     while (true) {
         skip_whitespace();
-        if (match("+")) {
-            skip_whitespace();
-            auto right = parse_factor();
-            expr = std::make_unique<BinaryExpr>(BinaryExpr::Op::Add, std::move(expr), std::move(right));
-        } else if (match("-")) {
-            skip_whitespace();
-            auto right = parse_factor();
-            expr = std::make_unique<BinaryExpr>(BinaryExpr::Op::Sub, std::move(expr), std::move(right));
-        } else {
-            break;
-        }
+        BinaryExpr::Op op;
+        if (match("+")) op = BinaryExpr::Op::Add;
+        else if (match("-")) op = BinaryExpr::Op::Sub;
+        else break;
+        
+        skip_whitespace();
+        auto right = parse_factor();
+        expr = std::make_unique<BinaryExpr>(
+            make_span(start),
+            op,
+            std::move(expr),
+            std::move(right)
+        );
     }
     
     return expr;
 }
 
 std::unique_ptr<Expr> Parser::parse_factor() {
+    size_t start = pos;
     auto expr = parse_unary();
     
     while (true) {
         skip_whitespace();
-        if (match("*")) {
-            skip_whitespace();
-            auto right = parse_unary();
-            expr = std::make_unique<BinaryExpr>(BinaryExpr::Op::Mul, std::move(expr), std::move(right));
-        } else if (match("/")) {
-            skip_whitespace();
-            auto right = parse_unary();
-            expr = std::make_unique<BinaryExpr>(BinaryExpr::Op::Div, std::move(expr), std::move(right));
-        } else {
-            break;
-        }
+        BinaryExpr::Op op;
+        if (match("*")) op = BinaryExpr::Op::Mul;
+        else if (match("/")) op = BinaryExpr::Op::Div;
+        else break;
+        
+        skip_whitespace();
+        auto right = parse_unary();
+        expr = std::make_unique<BinaryExpr>(
+            make_span(start),
+            op,
+            std::move(expr),
+            std::move(right)
+        );
     }
     
     return expr;
 }
 
 std::unique_ptr<Expr> Parser::parse_unary() {
+    size_t start = pos;
     skip_whitespace();
     
     if (match("-")) {
         auto operand = parse_unary();
-        return std::make_unique<UnaryExpr>(UnaryExpr::Op::Neg, std::move(operand));
+        return std::make_unique<UnaryExpr>(
+            make_span(start),
+            UnaryExpr::Op::Neg,
+            std::move(operand)
+        );
     }
     
     if (match("!")) {
         auto operand = parse_unary();
-        return std::make_unique<UnaryExpr>(UnaryExpr::Op::Not, std::move(operand));
+        return std::make_unique<UnaryExpr>(
+            make_span(start),
+            UnaryExpr::Op::Not,
+            std::move(operand)
+        );
     }
     
     if (match("&")) {
         bool is_mut = match("mut");
         if (is_mut) skip_whitespace();
         auto expr = parse_unary();
-        return std::make_unique<BorrowExpr>(is_mut, std::move(expr));
+        return std::make_unique<BorrowExpr>(
+            make_span(start),
+            is_mut,
+            std::move(expr)
+        );
     }
     
     return parse_call();
 }
 
 std::unique_ptr<Expr> Parser::parse_call() {
+    size_t start = pos;
     auto expr = parse_primary();
     
     while (true) {
@@ -302,7 +418,11 @@ std::unique_ptr<Expr> Parser::parse_call() {
             }
             
             expect(")");
-            expr = std::make_unique<CallExpr>(std::move(expr), std::move(args));
+            expr = std::make_unique<CallExpr>(
+                make_span(start),
+                std::move(expr),
+                std::move(args)
+            );
         } else {
             break;
         }
@@ -312,26 +432,30 @@ std::unique_ptr<Expr> Parser::parse_call() {
 }
 
 std::unique_ptr<Expr> Parser::parse_primary() {
+    size_t start = pos;
     skip_whitespace();
     
     if (std::isdigit(source[pos])) {
-        return std::make_unique<IntLiteral>(consume_integer());
+        return std::make_unique<IntLiteral>(make_span(start), consume_integer());
     }
     
     if (match("true")) {
-        return std::make_unique<BoolLiteral>(true);
+        return std::make_unique<BoolLiteral>(make_span(start), true);
     }
     
     if (match("false")) {
-        return std::make_unique<BoolLiteral>(false);
+        return std::make_unique<BoolLiteral>(make_span(start), false);
     }
     
     if (source[pos] == '"') {
-        return std::make_unique<StringLiteral>(consume_string());
+        return std::make_unique<StringLiteral>(make_span(start), consume_string());
     }
     
     if (std::isalpha(source[pos]) || source[pos] == '_') {
-        return std::make_unique<Identifier>(consume_identifier());
+        auto ident = std::make_unique<Identifier>(make_span(start), consume_identifier());
+        // Check if identifier is mutable in current scope
+        // This will be used by the type checker
+        return ident;
     }
     
     if (match("(")) {
@@ -428,8 +552,20 @@ bool Parser::at_end() {
 
 void Parser::error(const std::string& message) {
     std::stringstream ss;
-    ss << "Parse error: " << message;
+    ss << "Parse error at position " << pos << ": " << message;
     throw std::runtime_error(ss.str());
+}
+
+std::shared_ptr<Scope> Parser::enter_scope() {
+    auto new_scope = std::make_shared<Scope>(current_scope);
+    current_scope = new_scope;
+    return new_scope;
+}
+
+void Parser::exit_scope() {
+    if (auto parent = current_scope->parent.lock()) {
+        current_scope = parent;
+    }
 }
 
 void Parser::synchronize() {

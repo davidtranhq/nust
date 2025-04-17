@@ -8,6 +8,14 @@
 
 namespace nust {
 
+// Location information for error reporting
+struct Span {
+    size_t start;
+    size_t end;
+    
+    Span(size_t start, size_t end) : start(start), end(end) {}
+};
+
 // Forward declarations
 class ASTNode;
 class Program;
@@ -35,12 +43,16 @@ enum class Precedence {
 class ASTNode {
 public:
     virtual ~ASTNode() = default;
+    Span span;
+protected:
+    ASTNode(Span span) : span(span) {}
 };
 
 class Program : public ASTNode {
 public:
     std::vector<std::unique_ptr<ASTNode>> items;
-    Program(std::vector<std::unique_ptr<ASTNode>> items) : items(std::move(items)) {}
+    Program(Span span, std::vector<std::unique_ptr<ASTNode>> items) 
+        : ASTNode(span), items(std::move(items)) {}
 };
 
 class FunctionDecl : public ASTNode {
@@ -49,36 +61,58 @@ public:
         bool is_mut;
         std::string name;
         std::unique_ptr<Type> type;
+        Span span;
+        
+        Param(bool is_mut, std::string name, std::unique_ptr<Type> type, Span span)
+            : is_mut(is_mut), name(std::move(name)), type(std::move(type)), span(span) {}
     };
     
     std::string name;
     std::vector<Param> params;
+    std::unique_ptr<Type> return_type;  // Added return type
     std::unique_ptr<Stmt> body;
     
-    FunctionDecl(std::string name, std::vector<Param> params, std::unique_ptr<Stmt> body)
-        : name(std::move(name)), params(std::move(params)), body(std::move(body)) {}
+    FunctionDecl(Span span, std::string name, std::vector<Param> params, 
+                std::unique_ptr<Type> return_type, std::unique_ptr<Stmt> body)
+        : ASTNode(span), name(std::move(name)), params(std::move(params)),
+          return_type(std::move(return_type)), body(std::move(body)) {}
+};
+
+// Represents a lexical scope for borrow checking
+class Scope {
+public:
+    std::weak_ptr<Scope> parent;
+    std::vector<std::string> declarations;  // Variables declared in this scope
+    
+    explicit Scope(std::weak_ptr<Scope> parent = {}) : parent(parent) {}
 };
 
 class Stmt : public ASTNode {
 public:
+    std::shared_ptr<Scope> scope;  // Each statement has access to its enclosing scope
     virtual ~Stmt() = default;
+protected:
+    Stmt(Span span, std::shared_ptr<Scope> scope) : ASTNode(span), scope(scope) {}
 };
 
 class LetStmt : public Stmt {
 public:
-    bool is_mut;
+    bool is_mut;  // Added mutability flag for let bindings
     std::string name;
     std::unique_ptr<Type> type;
     std::unique_ptr<Expr> init;
     
-    LetStmt(bool is_mut, std::string name, std::unique_ptr<Type> type, std::unique_ptr<Expr> init)
-        : is_mut(is_mut), name(std::move(name)), type(std::move(type)), init(std::move(init)) {}
+    LetStmt(Span span, std::shared_ptr<Scope> scope, bool is_mut, std::string name, 
+            std::unique_ptr<Type> type, std::unique_ptr<Expr> init)
+        : Stmt(span, scope), is_mut(is_mut), name(std::move(name)), 
+          type(std::move(type)), init(std::move(init)) {}
 };
 
 class ExprStmt : public Stmt {
 public:
     std::unique_ptr<Expr> expr;
-    ExprStmt(std::unique_ptr<Expr> expr) : expr(std::move(expr)) {}
+    ExprStmt(Span span, std::shared_ptr<Scope> scope, std::unique_ptr<Expr> expr)
+        : Stmt(span, scope), expr(std::move(expr)) {}
 };
 
 class IfStmt : public Stmt {
@@ -87,8 +121,10 @@ public:
     std::unique_ptr<Stmt> then_branch;
     std::unique_ptr<Stmt> else_branch;
     
-    IfStmt(std::unique_ptr<Expr> condition, std::unique_ptr<Stmt> then_branch, std::unique_ptr<Stmt> else_branch)
-        : condition(std::move(condition)), then_branch(std::move(then_branch)), else_branch(std::move(else_branch)) {}
+    IfStmt(Span span, std::shared_ptr<Scope> scope, std::unique_ptr<Expr> condition,
+           std::unique_ptr<Stmt> then_branch, std::unique_ptr<Stmt> else_branch)
+        : Stmt(span, scope), condition(std::move(condition)),
+          then_branch(std::move(then_branch)), else_branch(std::move(else_branch)) {}
 };
 
 class WhileStmt : public Stmt {
@@ -96,43 +132,50 @@ public:
     std::unique_ptr<Expr> condition;
     std::unique_ptr<Stmt> body;
     
-    WhileStmt(std::unique_ptr<Expr> condition, std::unique_ptr<Stmt> body)
-        : condition(std::move(condition)), body(std::move(body)) {}
+    WhileStmt(Span span, std::shared_ptr<Scope> scope, std::unique_ptr<Expr> condition,
+              std::unique_ptr<Stmt> body)
+        : Stmt(span, scope), condition(std::move(condition)), body(std::move(body)) {}
 };
 
 class BlockStmt : public Stmt {
 public:
     std::vector<std::unique_ptr<Stmt>> statements;
-    BlockStmt(std::vector<std::unique_ptr<Stmt>> statements) : statements(std::move(statements)) {}
+    BlockStmt(Span span, std::shared_ptr<Scope> scope, std::vector<std::unique_ptr<Stmt>> statements)
+        : Stmt(span, scope), statements(std::move(statements)) {}
 };
 
 class Expr : public ASTNode {
 public:
+    std::unique_ptr<Type> type;  // Type of the expression, filled in by type checker
     virtual ~Expr() = default;
+protected:
+    Expr(Span span) : ASTNode(span) {}
 };
 
 class IntLiteral : public Expr {
 public:
     int value;
-    IntLiteral(int value) : value(value) {}
+    IntLiteral(Span span, int value) : Expr(span), value(value) {}
 };
 
 class BoolLiteral : public Expr {
 public:
     bool value;
-    BoolLiteral(bool value) : value(value) {}
+    BoolLiteral(Span span, bool value) : Expr(span), value(value) {}
 };
 
 class StringLiteral : public Expr {
 public:
     std::string value;
-    StringLiteral(std::string value) : value(std::move(value)) {}
+    StringLiteral(Span span, std::string value) : Expr(span), value(std::move(value)) {}
 };
 
 class Identifier : public Expr {
 public:
     std::string name;
-    Identifier(std::string name) : name(std::move(name)) {}
+    bool is_mut_binding;  // Whether this identifier refers to a mutable binding
+    Identifier(Span span, std::string name)
+        : Expr(span), name(std::move(name)), is_mut_binding(false) {}
 };
 
 class BinaryExpr : public Expr {
@@ -145,8 +188,8 @@ public:
     std::unique_ptr<Expr> left;
     std::unique_ptr<Expr> right;
     
-    BinaryExpr(Op op, std::unique_ptr<Expr> left, std::unique_ptr<Expr> right)
-        : op(op), left(std::move(left)), right(std::move(right)) {}
+    BinaryExpr(Span span, Op op, std::unique_ptr<Expr> left, std::unique_ptr<Expr> right)
+        : Expr(span), op(op), left(std::move(left)), right(std::move(right)) {}
 };
 
 class UnaryExpr : public Expr {
@@ -155,7 +198,8 @@ public:
     Op op;
     std::unique_ptr<Expr> expr;
     
-    UnaryExpr(Op op, std::unique_ptr<Expr> expr) : op(op), expr(std::move(expr)) {}
+    UnaryExpr(Span span, Op op, std::unique_ptr<Expr> expr)
+        : Expr(span), op(op), expr(std::move(expr)) {}
 };
 
 class BorrowExpr : public Expr {
@@ -163,7 +207,8 @@ public:
     bool is_mut;
     std::unique_ptr<Expr> expr;
     
-    BorrowExpr(bool is_mut, std::unique_ptr<Expr> expr) : is_mut(is_mut), expr(std::move(expr)) {}
+    BorrowExpr(Span span, bool is_mut, std::unique_ptr<Expr> expr)
+        : Expr(span), is_mut(is_mut), expr(std::move(expr)) {}
 };
 
 class CallExpr : public Expr {
@@ -171,8 +216,8 @@ public:
     std::unique_ptr<Expr> callee;
     std::vector<std::unique_ptr<Expr>> args;
     
-    CallExpr(std::unique_ptr<Expr> callee, std::vector<std::unique_ptr<Expr>> args)
-        : callee(std::move(callee)), args(std::move(args)) {}
+    CallExpr(Span span, std::unique_ptr<Expr> callee, std::vector<std::unique_ptr<Expr>> args)
+        : Expr(span), callee(std::move(callee)), args(std::move(args)) {}
 };
 
 class Type {
@@ -183,9 +228,11 @@ public:
     };
     Kind kind;
     std::unique_ptr<Type> base_type; // For Ref and MutRef
+    Span span;
     
-    Type(Kind kind) : kind(kind) {}
-    Type(Kind kind, std::unique_ptr<Type> base_type) : kind(kind), base_type(std::move(base_type)) {}
+    Type(Kind kind, Span span) : kind(kind), span(span) {}
+    Type(Kind kind, std::unique_ptr<Type> base_type, Span span)
+        : kind(kind), base_type(std::move(base_type)), span(span) {}
 };
 
 class Parser {
@@ -205,6 +252,12 @@ private:
     bool at_end();
     void error(const std::string& message);
     void synchronize();
+    Span make_span(size_t start) const { return Span(start, pos); }
+    
+    // Scope management
+    std::shared_ptr<Scope> current_scope;
+    std::shared_ptr<Scope> enter_scope();
+    void exit_scope();
     
     // Parsing functions
     std::unique_ptr<FunctionDecl> parse_function();
