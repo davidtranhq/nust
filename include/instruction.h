@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 namespace nust {
 
@@ -55,6 +56,62 @@ enum class Opcode : uint8_t {
     DEREF,      // Dereference reference
     DEREF_MUT   // Dereference mutable reference
 };
+
+// Convert opcode to string representation
+inline std::string opcode_to_string(Opcode opcode) {
+    switch (opcode) {
+        // Stack operations
+        case Opcode::PUSH_I32:  return "PUSH_I32";
+        case Opcode::PUSH_BOOL: return "PUSH_BOOL";
+        case Opcode::PUSH_STR:  return "PUSH_STR";
+        case Opcode::POP:       return "POP";
+        case Opcode::DUP:       return "DUP";
+        case Opcode::SWAP:      return "SWAP";
+        
+        // Variable operations
+        case Opcode::LOAD:      return "LOAD";
+        case Opcode::STORE:     return "STORE";
+        case Opcode::LOAD_REF:  return "LOAD_REF";
+        case Opcode::STORE_REF: return "STORE_REF";
+        
+        // Arithmetic operations
+        case Opcode::ADD_I32:   return "ADD_I32";
+        case Opcode::SUB_I32:   return "SUB_I32";
+        case Opcode::MUL_I32:   return "MUL_I32";
+        case Opcode::DIV_I32:   return "DIV_I32";
+        case Opcode::NEG_I32:   return "NEG_I32";
+        
+        // Comparison operations
+        case Opcode::EQ_I32:    return "EQ_I32";
+        case Opcode::NE_I32:    return "NE_I32";
+        case Opcode::LT_I32:    return "LT_I32";
+        case Opcode::GT_I32:    return "GT_I32";
+        case Opcode::LE_I32:    return "LE_I32";
+        case Opcode::GE_I32:    return "GE_I32";
+        
+        // Logical operations
+        case Opcode::AND:       return "AND";
+        case Opcode::OR:        return "OR";
+        case Opcode::NOT:       return "NOT";
+        
+        // Control flow
+        case Opcode::JMP:       return "JMP";
+        case Opcode::JMP_IF:    return "JMP_IF";
+        case Opcode::JMP_IF_NOT: return "JMP_IF_NOT";
+        case Opcode::CALL:      return "CALL";
+        case Opcode::RET:       return "RET";
+        case Opcode::RET_VAL:   return "RET_VAL";
+        
+        // Reference operations
+        case Opcode::BORROW:    return "BORROW";
+        case Opcode::BORROW_MUT: return "BORROW_MUT";
+        case Opcode::DEREF:     return "DEREF";
+        case Opcode::DEREF_MUT: return "DEREF_MUT";
+        
+        default:
+            return "UNKNOWN_OPCODE";
+    }
+}
 
 // Instruction structure
 struct Instruction {

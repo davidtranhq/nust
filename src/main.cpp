@@ -4,7 +4,6 @@
 #include "parser/parser.h"
 #include "type_checker.h"
 #include "compiler.h"
-#include "vm.h"
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {
@@ -29,8 +28,8 @@ int main(int argc, char* argv[]) {
         auto program = parser.parse();
         
         // Type check
-        nust::TypeChecker type_checker(*program);
-        if (!type_checker.check()) {
+        nust::TypeChecker type_checker;
+        if (!type_checker.check_program(*program)) {
             std::cerr << "Type checking failed\n";
             return 1;
         }
@@ -38,35 +37,45 @@ int main(int argc, char* argv[]) {
         // Compile to bytecode
         nust::Compiler compiler;
         auto instructions = compiler.compile(*program);
-        
-        // Convert instructions to bytecode
-        std::vector<uint8_t> bytecode;
+
+        // get the filename without the extension
+        std::string filename = argv[1];
+        size_t dot_pos = filename.find_last_of('.');
+        if (dot_pos != std::string::npos) {
+            filename = filename.substr(0, dot_pos);
+        }
+
+        // Output instructions as assembly to *.ns file
+        std::ofstream output_asm_file(filename + std::string(".ns"));
+        if (!output_asm_file.is_open()) {
+            std::cerr << "Failed to open output file: " << filename + std::string(".s") << "\n";
+            return 1;
+        }
         for (const auto& instr : instructions) {
-            bytecode.push_back(static_cast<uint8_t>(instr.opcode));
+            output_asm_file << nust::opcode_to_string(instr.opcode);
+            if (instr.has_operand()) {
+                output_asm_file << " " << instr.operand;
+            }
+            output_asm_file << "\n";
+        }
+        
+
+        // Output bytecode to *.no file
+        std::ofstream output_bytecode_file(filename + std::string(".no"));
+        if (!output_bytecode_file.is_open()) {
+            std::cerr << "Failed to open output file: " << filename + std::string(".no") << "\n";
+            return 1;
+        }
+        
+        for (const auto& instr : instructions) {
+            output_bytecode_file << static_cast<uint8_t>(instr.opcode);
             if (instr.has_operand()) {
                 // Encode operand as little-endian
                 for (size_t i = 0; i < sizeof(size_t); ++i) {
-                    bytecode.push_back((instr.operand >> (i * 8)) & 0xFF);
+                    output_bytecode_file << static_cast<uint8_t>((instr.operand >> (i * 8)) & 0xFF);
                 }
             }
         }
-        
-        // Execute bytecode
-        nust::VM vm;
-        if (!vm.load_bytecode(bytecode)) {
-            std::cerr << "Failed to load bytecode\n";
-            return 1;
-        }
-        
-        std::cout << "Executing program...\n";
-        if (!vm.execute()) {
-            std::cerr << "Failed to execute bytecode\n";
-            return 1;
-        }
-        
-        std::cout << "Execution completed successfully\n";
-        return 0;
-        
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << "\n";
         return 1;
