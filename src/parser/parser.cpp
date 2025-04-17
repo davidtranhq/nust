@@ -271,20 +271,52 @@ std::unique_ptr<BlockStmt> Parser::parse_block() {
 }
 
 std::unique_ptr<Expr> Parser::parse_expr() {
-    return parse_equality();
+    return parse_or();
+}
+
+std::unique_ptr<Expr> Parser::parse_or() {
+    auto expr = parse_and();
+    
+    while (match("||")) {
+        skip_whitespace();
+        auto right = parse_and();
+        expr = std::make_unique<BinaryExpr>(
+            make_span(expr->span.start),
+            BinaryExpr::Op::Or,
+            std::move(expr),
+            std::move(right)
+        );
+    }
+    
+    return expr;
+}
+
+std::unique_ptr<Expr> Parser::parse_and() {
+    auto expr = parse_equality();
+    
+    while (match("&&")) {
+        skip_whitespace();
+        auto right = parse_equality();
+        expr = std::make_unique<BinaryExpr>(
+            make_span(expr->span.start),
+            BinaryExpr::Op::And,
+            std::move(expr),
+            std::move(right)
+        );
+    }
+    
+    return expr;
 }
 
 std::unique_ptr<Expr> Parser::parse_equality() {
-    size_t start = pos;
     auto expr = parse_comparison();
     
     while (true) {
-        skip_whitespace();
         if (match("==")) {
             skip_whitespace();
             auto right = parse_comparison();
             expr = std::make_unique<BinaryExpr>(
-                make_span(start),
+                make_span(expr->span.start),
                 BinaryExpr::Op::Eq,
                 std::move(expr),
                 std::move(right)
@@ -293,7 +325,7 @@ std::unique_ptr<Expr> Parser::parse_equality() {
             skip_whitespace();
             auto right = parse_comparison();
             expr = std::make_unique<BinaryExpr>(
-                make_span(start),
+                make_span(expr->span.start),
                 BinaryExpr::Op::Ne,
                 std::move(expr),
                 std::move(right)

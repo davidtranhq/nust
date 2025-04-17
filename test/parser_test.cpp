@@ -334,7 +334,7 @@ TEST(ParserTest, ExpressionPrecedence) {
     std::string source = R"(
         fn test() {
             let x: i32 = 1 + 2 * 3;
-            let y: bool = true;  // Simplified for now since we don't have boolean operators yet
+            let y: bool = !true && false || true;
             let z: i32 = (1 + 2) * (3 + 4);
         }
     )";
@@ -366,13 +366,37 @@ TEST(ParserTest, ExpressionPrecedence) {
     ASSERT_TRUE(right1 != nullptr);
     ASSERT_EQ(right1->op, BinaryExpr::Op::Mul);
     
-    // Check second expression: true
+    // Check second expression: !true && false || true
     auto* let_y = dynamic_cast<LetStmt*>(body->statements[1].get());
     ASSERT_TRUE(let_y != nullptr);
     
-    auto* bool_lit = dynamic_cast<BoolLiteral*>(let_y->init.get());
-    ASSERT_TRUE(bool_lit != nullptr);
-    ASSERT_TRUE(bool_lit->value);
+    auto* expr2 = dynamic_cast<BinaryExpr*>(let_y->init.get());
+    ASSERT_TRUE(expr2 != nullptr);
+    ASSERT_EQ(expr2->op, BinaryExpr::Op::Or);
+    
+    // Check left side of OR: !true && false
+    auto* left2 = dynamic_cast<BinaryExpr*>(expr2->left.get());
+    ASSERT_TRUE(left2 != nullptr);
+    ASSERT_EQ(left2->op, BinaryExpr::Op::And);
+    
+    // Check !true
+    auto* not_expr = dynamic_cast<UnaryExpr*>(left2->left.get());
+    ASSERT_TRUE(not_expr != nullptr);
+    ASSERT_EQ(not_expr->op, UnaryExpr::Op::Not);
+    
+    auto* true_lit = dynamic_cast<BoolLiteral*>(not_expr->expr.get());
+    ASSERT_TRUE(true_lit != nullptr);
+    ASSERT_TRUE(true_lit->value);
+    
+    // Check false
+    auto* false_lit = dynamic_cast<BoolLiteral*>(left2->right.get());
+    ASSERT_TRUE(false_lit != nullptr);
+    ASSERT_FALSE(false_lit->value);
+    
+    // Check right side of OR: true
+    auto* right2 = dynamic_cast<BoolLiteral*>(expr2->right.get());
+    ASSERT_TRUE(right2 != nullptr);
+    ASSERT_TRUE(right2->value);
     
     // Check third expression: (1 + 2) * (3 + 4)
     auto* let_z = dynamic_cast<LetStmt*>(body->statements[2].get());

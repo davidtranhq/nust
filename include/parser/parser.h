@@ -182,7 +182,8 @@ class BinaryExpr : public Expr {
 public:
     enum class Op {
         Add, Sub, Mul, Div,
-        Eq, Ne, Lt, Gt, Le, Ge
+        Eq, Ne, Lt, Gt, Le, Ge,
+        And, Or  // Logical AND and OR
     };
     Op op;
     std::unique_ptr<Expr> left;
@@ -276,6 +277,8 @@ private:
     std::unique_ptr<Expr> parse_unary();
     std::unique_ptr<Expr> parse_call();
     std::unique_ptr<Expr> parse_primary();
+    std::unique_ptr<Expr> parse_or();
+    std::unique_ptr<Expr> parse_and();
     
     std::string source;
     size_t pos = 0;
