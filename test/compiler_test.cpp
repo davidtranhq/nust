@@ -142,7 +142,7 @@ TEST_F(CompilerTest, ArithmeticExpressions) {
 TEST_F(CompilerTest, ControlFlow) {
     std::string source = R"(
         fn main() {
-            let x: i32 = 42;
+            let mut x: i32 = 42;
             if (x > 0) {
                 x = x + 1;
             }
@@ -173,13 +173,14 @@ TEST_F(CompilerTest, ControlFlow) {
     expect_instruction(instructions, 2, Opcode::LOAD, 0);
     expect_instruction(instructions, 3, Opcode::PUSH_I32, 0);
     expect_instruction(instructions, 4, Opcode::GT_I32);
-    expect_instruction(instructions, 5, Opcode::JMP_IF_NOT);
+    expect_instruction(instructions, 5, Opcode::JMP_IF_NOT, 12);
     expect_instruction(instructions, 6, Opcode::LOAD, 0);
     expect_instruction(instructions, 7, Opcode::PUSH_I32, 1);
     expect_instruction(instructions, 8, Opcode::ADD_I32);
     expect_instruction(instructions, 9, Opcode::STORE, 0);
-    expect_instruction(instructions, 10, Opcode::JMP);
-    expect_instruction(instructions, 11, Opcode::RET);
+    expect_instruction(instructions, 10, Opcode::LOAD, 0);
+    expect_instruction(instructions, 11, Opcode::POP);
+    expect_instruction(instructions, 12, Opcode::RET);
 }
 
 TEST_F(CompilerTest, FunctionCalls) {
@@ -293,13 +294,15 @@ TEST_F(CompilerTest, WhileLoop) {
     expect_instruction(instructions, 2, Opcode::LOAD, 0);
     expect_instruction(instructions, 3, Opcode::PUSH_I32, 0);
     expect_instruction(instructions, 4, Opcode::GT_I32);
-    expect_instruction(instructions, 5, Opcode::JMP_IF_NOT);
+    expect_instruction(instructions, 5, Opcode::JMP_IF_NOT, 13);
     expect_instruction(instructions, 6, Opcode::LOAD, 0);
     expect_instruction(instructions, 7, Opcode::PUSH_I32, 1);
     expect_instruction(instructions, 8, Opcode::SUB_I32);
     expect_instruction(instructions, 9, Opcode::STORE, 0);
-    expect_instruction(instructions, 10, Opcode::JMP);
-    expect_instruction(instructions, 11, Opcode::RET);
+    expect_instruction(instructions, 10, Opcode::LOAD, 0);
+    expect_instruction(instructions, 11, Opcode::POP);
+    expect_instruction(instructions, 12, Opcode::JMP, 2);
+    expect_instruction(instructions, 13, Opcode::RET);
 }
 
 TEST_F(CompilerTest, StringLiterals) {

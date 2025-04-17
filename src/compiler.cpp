@@ -275,9 +275,6 @@ void Compiler::compile_while(const WhileStmt* while_stmt) {
     std::cout << "Emitting conditional jump" << std::endl;
     size_t exit_jump = emit_instruction(Opcode::JMP_IF_NOT, 0);
     
-    // Pop condition value
-    std::cout << "Popping condition value" << std::endl;
-    emit_instruction(Opcode::POP);
     
     // Compile body
     std::cout << "Compiling loop body" << std::endl;
