@@ -15,11 +15,7 @@ std::unique_ptr<Program> Parser::parse() {
     
     skip_whitespace();
     while (!at_end()) {
-        try {
-            items.push_back(parse_function());
-        } catch (const std::runtime_error& e) {
-            synchronize();
-        }
+        items.push_back(parse_function());
         skip_whitespace();
     }
 
@@ -132,7 +128,7 @@ std::unique_ptr<Stmt> Parser::parse_statement() {
     if (match("let")) return parse_let();
     if (match("if")) return parse_if();
     if (match("while")) return parse_while();
-    if (match("{")) return parse_block();
+    if (peek("{")) return parse_block();
     
     // Expression statement
     size_t start = pos;
@@ -244,19 +240,8 @@ std::unique_ptr<BlockStmt> Parser::parse_block() {
     
     skip_whitespace();
     while (!at_end() && !peek("}")) {
-        try {
-            statements.push_back(parse_statement());
-            skip_whitespace();
-        } catch (const std::runtime_error& e) {
-            // If we hit an error, try to find the next statement or closing brace
-            while (!at_end() && !peek("}") && !peek("let") && !peek("if") && !peek("while")) {
-                pos++;  // Move to next character
-                skip_whitespace();
-            }
-            if (at_end()) {
-                error("Unclosed block");
-            }
-        }
+        statements.push_back(parse_statement());
+        skip_whitespace();
     }
     
     expect("}");
@@ -276,19 +261,14 @@ std::unique_ptr<Expr> Parser::parse_expr() {
 }
 
 std::unique_ptr<Expr> Parser::parse_assignment() {
-    std::cout << "Starting parse_assignment at pos " << pos << std::endl;
     auto lhs = parse_or();
-    std::cout << "Parsed LHS, type: " << typeid(*lhs.get()).name() << std::endl;
     
     if (match("=")) {
-        std::cout << "Found = operator" << std::endl;
         skip_whitespace();
         // Validate that left side is an identifier
         if (dynamic_cast<Identifier*>(lhs.get()) == nullptr) {
-            std::cout << "LHS is not an identifier, throwing error" << std::endl;
             throw std::runtime_error("Invalid assignment target");
         }
-        std::cout << "LHS is an identifier, proceeding with assignment" << std::endl;
         auto rhs = parse_assignment();  // Right-associative
         return std::make_unique<BinaryExpr>(
             make_span(lhs->span.start),
@@ -298,7 +278,6 @@ std::unique_ptr<Expr> Parser::parse_assignment() {
         );
     }
     
-    std::cout << "No = operator found, returning LHS" << std::endl;
     return lhs;
 }
 
@@ -616,9 +595,24 @@ std::string Parser::consume_string() {
 }
 
 void Parser::skip_whitespace() {
-    while (pos < source.length() && 
-           (std::isspace(source[pos]) || source[pos] == '\n' || source[pos] == '\r')) {
-        pos++;
+    while (pos < source.length()) {
+        // Skip whitespace characters
+        if (std::isspace(source[pos]) || source[pos] == '\n' || source[pos] == '\r') {
+            pos++;
+            continue;
+        }
+        
+        // Handle comments
+        if (pos + 1 < source.length() && source[pos] == '/' && source[pos + 1] == '/') {
+            // Skip until we find a newline or reach the end
+            pos += 2;  // Skip the "//"
+            while (pos < source.length() && source[pos] != '\n' && source[pos] != '\r') {
+                pos++;
+            }
+            continue;
+        }
+        
+        break;
     }
 }
 
@@ -641,27 +635,6 @@ std::shared_ptr<Scope> Parser::enter_scope() {
 void Parser::exit_scope() {
     if (auto parent = current_scope->parent.lock()) {
         current_scope = parent;
-    }
-}
-
-void Parser::synchronize() {
-    while (!at_end()) {
-        if (source[pos] == ';') {
-            pos++;
-            return;
-        }
-        
-        static const std::vector<std::string> keywords = {
-            "fn", "let", "if", "else", "while"
-        };
-        
-        for (const auto& keyword : keywords) {
-            if (peek(keyword)) {
-                return;
-            }
-        }
-        
-        pos++;
     }
 }
 
