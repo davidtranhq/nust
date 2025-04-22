@@ -1,0 +1,14 @@
+\frametitle{VM Implementation}
+\begin{lstlisting}[language=C++]
+class VirtualMachine {
+    std::vector<Value> stack_;
+    std::vector<Value> memory_;
+    size_t pc_ = 0;
+    size_t fp_ = 0;
+
+    void execute_instruction(const Instruction& instr);
+    void handle_call(size_t operand);
+    void handle_ret();
+    // ...
+};
+\end{lstlisting}

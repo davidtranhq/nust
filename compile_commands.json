@@ -1,0 +1,98 @@
+[
+ {
+  "directory": "/Users/david/src/nust-lang",
+  "arguments": [
+   "g++",
+   "-std=c++17",
+   "-I/opt/homebrew/Cellar/googletest/1.16.0/include",
+   "-Iinclude",
+   "-I/opt/homebrew/include",
+   "-g",
+   "-c",
+   "src/compiler.cpp",
+   "-o",
+   "build/compiler.o"
+  ],
+  "file": "src/compiler.cpp"
+ },
+ {
+  "directory": "/Users/david/src/nust-lang",
+  "arguments": [
+   "g++",
+   "-std=c++17",
+   "-I/opt/homebrew/Cellar/googletest/1.16.0/include",
+   "-Iinclude",
+   "-I/opt/homebrew/include",
+   "-g",
+   "-c",
+   "src/function_table.cpp",
+   "-o",
+   "build/function_table.o"
+  ],
+  "file": "src/function_table.cpp"
+ },
+ {
+  "directory": "/Users/david/src/nust-lang",
+  "arguments": [
+   "g++",
+   "-std=c++17",
+   "-I/opt/homebrew/Cellar/googletest/1.16.0/include",
+   "-Iinclude",
+   "-I/opt/homebrew/include",
+   "-g",
+   "-c",
+   "src/type_checker.cpp",
+   "-o",
+   "build/type_checker.o"
+  ],
+  "file": "src/type_checker.cpp"
+ },
+ {
+  "directory": "/Users/david/src/nust-lang",
+  "arguments": [
+   "g++",
+   "-std=c++17",
+   "-I/opt/homebrew/Cellar/googletest/1.16.0/include",
+   "-Iinclude",
+   "-I/opt/homebrew/include",
+   "-g",
+   "-c",
+   "src/vm.cpp",
+   "-o",
+   "build/vm.o"
+  ],
+  "file": "src/vm.cpp"
+ },
+ {
+  "directory": "/Users/david/src/nust-lang",
+  "arguments": [
+   "g++",
+   "-std=c++17",
+   "-I/opt/homebrew/Cellar/googletest/1.16.0/include",
+   "-Iinclude",
+   "-I/opt/homebrew/include",
+   "-g",
+   "-c",
+   "src/parser/parser.cpp",
+   "-o",
+   "build/parser/parser.o"
+  ],
+  "file": "src/parser/parser.cpp"
+ },
+ {
+  "directory": "/Users/david/src/nust-lang",
+  "arguments": [
+   "g++",
+   "-std=c++17",
+   "-I/opt/homebrew/Cellar/googletest/1.16.0/include",
+   "-Iinclude",
+   "-I/opt/homebrew/include",
+   "-g",
+   "-c",
+   "src/main.cpp",
+   "-o",
+   "build/main.o"
+  ],
+  "file": "src/main.cpp"
+ }
+]
