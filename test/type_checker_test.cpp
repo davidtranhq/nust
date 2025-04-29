@@ -1,4 +1,4 @@
-#include "parser/parser.h"
+#include "parser.h"
 #include "type_checker.h"
 #include <gtest/gtest.h>
 

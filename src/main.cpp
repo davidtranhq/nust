@@ -1,7 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include "parser/parser.h"
+#include "parser.h"
 #include "type_checker.h"
 #include "compiler.h"
 #include "vm.h"

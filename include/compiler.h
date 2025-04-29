@@ -1,6 +1,6 @@
 #pragma once
 
-#include "parser/parser.h"
+#include "parser.h"
 #include "instruction.h"
 #include "function_table.h"
 #include <vector>

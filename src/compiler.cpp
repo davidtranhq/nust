@@ -1,5 +1,5 @@
 #include "compiler.h"
-#include "parser/parser.h"
+#include "parser.h"
 #include <stdexcept>
 #include <iostream>
 

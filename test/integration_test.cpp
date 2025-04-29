@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include "compiler.h"
-#include "parser/parser.h"
+#include "parser.h"
 #include "vm.h"
 #include <sstream>
 #include <string>

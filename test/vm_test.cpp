@@ -3,7 +3,7 @@
 #include "value.h"
 #include "instruction.h"
 #include "function_table.h"
-#include "parser/parser.h"
+#include "parser.h"
 #include <vector>
 #include <memory>
 
